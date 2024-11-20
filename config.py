@@ -1,0 +1,40 @@
+#API_SAUKE
+#SASUKE_FOEMAT
+#BYSasUKE_API_KEY FAVDAUTCREHY
+#OWNER - @BeasTxt_Sasuke
+#KEY_REDEMPTION_1711
+#ACCESS_KEY_1711
+#FAILED_SasUKE_1711
+#HFAHYOYO_YTIATII_1575757_AS4575AA_57A7ASUYUT_WUUTIUU_4687_1711
+#JOIN - @Mahakal1814
+#CHANNEL- @Mahakal1814
+
+# Don't use quotes( " and ' )
+#SCRIPT BY SASUKE
+  
+#Enter Your Bot Token here get it from @botfarher
+BOT_TOKEN=("7326172590:AAF-m0nnmtHZTh7AncZjDv_vxzFc1uexW6I")
+
+  #Enter Your telegram username here without @
+OWNER_USERNAME=("@Mahakal1814")
+
+  #Enter your admin id here Get it from @missRose_bot by typing /info
+ADMIN_IDS=("757915155")
+
+#API_SAUKE
+#SASUKE_FOEMAT
+#BYSasUKE_API_KEY FAVDAUTCREHY
+#OWNER - @Mahakal1814
+#KEY_REDEMPTION_1711
+#ACCESS_KEY_1711
+#FAILED_SasUKE_1711
+#HFAHYOYO_YTIATII_1575757_AS4575AA_57A7ASUYUT_WUUTIUU_4687_1711
+#JOIN - @Mahakal1814
+#CHANNEL- @Mahakal1814
+
+
+
+
+
+
+  

